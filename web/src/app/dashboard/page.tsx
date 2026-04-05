@@ -98,13 +98,14 @@ export default async function DashboardPage() {
     .select('access_role, patients(id, full_name)')
     .eq('user_id', user.id)
 
-  const patientId = Array.isArray(patients) && patients.length
-    ? (Array.isArray(patients[0].patients) ? patients[0].patients[0]?.id : patients[0].patients?.id)
+  const patientRow = Array.isArray(patients) && patients.length
+    ? (Array.isArray((patients[0] as any).patients)
+        ? (patients[0] as any).patients[0]
+        : (patients[0] as any).patients)
     : null
 
-  const patientName = Array.isArray(patients) && patients.length
-    ? (Array.isArray(patients[0].patients) ? patients[0].patients[0]?.full_name : patients[0].patients?.full_name)
-    : null
+  const patientId = patientRow?.id ?? null
+  const patientName = patientRow?.full_name ?? null
 
   let alerts: PanicAlert[] = []
   let medications: MedicationRow[] = []
