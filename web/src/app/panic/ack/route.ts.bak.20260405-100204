@@ -1,0 +1,31 @@
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+export async function POST(request: Request) {
+  const formData = await request.formData()
+  const id = String(formData.get('id') || '')
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user || !id) {
+    return NextResponse.redirect(new URL('/dashboard?e=no-user-or-id', request.url))
+  }
+
+  const { data, error } = await supabase.rpc('acknowledge_panic_alert', {
+    alert_id: id,
+  })
+
+  console.log('ACK rpc:', data, error)
+
+  if (error) {
+    return NextResponse.redirect(
+      new URL('/dashboard?e=' + encodeURIComponent(error.message), request.url)
+    )
+  }
+
+  if (!data || data.length === 0) {
+    return NextResponse.redirect(new URL('/dashboard?e=no-row-updated', request.url))
+  }
+
+  return NextResponse.redirect(new URL('/dashboard?ack=ok', request.url))
+}

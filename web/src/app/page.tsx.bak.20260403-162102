@@ -1,0 +1,86 @@
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  return (
+    <main className="min-h-screen px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-4xl">
+        <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-6 shadow-2xl shadow-black/20 sm:p-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-200">
+                Familienhilfe
+              </div>
+              <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                Med-Plan
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)] sm:text-base">
+                Medikamente, Termine und Notfallhilfe in einer klaren, gut lesbaren Oberfläche
+                für Handy und PC.
+              </p>
+            </div>
+
+            {user ? (
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-sm text-[var(--muted)]">
+                Angemeldet als
+                <div className="mt-1 font-medium text-white">{user.email}</div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+              <div className="text-sm font-medium text-white">Klare Rollen</div>
+              <div className="mt-2 text-sm text-[var(--muted)]">
+                Angelika sieht nur das Nötige. Familie übernimmt Organisation und Notfallannahme.
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+              <div className="text-sm font-medium text-white">Große Kontraste</div>
+              <div className="mt-2 text-sm text-[var(--muted)]">
+                Dunkles Design mit hoher Lesbarkeit und klaren Statusfarben.
+              </div>
+            </div>
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4">
+              <div className="text-sm font-medium text-red-100">Notfall zuerst</div>
+              <div className="mt-2 text-sm text-red-200/80">
+                Der Panikbutton bleibt auffällig und eindeutig.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            {user ? (
+              <>
+                <Link
+                  className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200"
+                  href="/dashboard"
+                >
+                  Zum Dashboard
+                </Link>
+                <form action="/auth/signout" method="post">
+                  <button
+                    className="inline-flex w-full items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-5 py-3 font-medium text-white transition hover:bg-white/5 sm:w-auto"
+                    type="submit"
+                  >
+                    Abmelden
+                  </button>
+                </form>
+              </>
+            ) : (
+              <Link
+                className="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200"
+                href="/login"
+              >
+                Login
+              </Link>
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}

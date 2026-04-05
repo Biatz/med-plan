@@ -1,0 +1,39 @@
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+export async function POST(request: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.redirect(new URL('/login', request.url), { status: 303 })
+  }
+
+  const { data: access } = await supabase
+    .from('patient_access')
+    .select('patient_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .single()
+
+  if (!access?.patient_id) {
+    return NextResponse.redirect(new URL('/dashboard?e=no-access', request.url), { status: 303 })
+  }
+
+  const { error } = await supabase
+    .from('panic_alerts')
+    .insert({
+      patient_id: access.patient_id,
+      triggered_by: user.id,
+      status: 'open',
+      message: 'Notfall ausgelöst',
+    })
+
+  if (error && error.code !== '23505') {
+    return NextResponse.redirect(
+      new URL('/dashboard?e=' + encodeURIComponent(error.message), request.url)
+    )
+  }
+
+  return NextResponse.redirect(new URL('/dashboard?panic=ok', request.url), { status: 303 })
+}

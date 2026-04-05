@@ -1,0 +1,848 @@
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import PushRegister from '@/components/push-register'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+type PanicAlert = {
+  id: string
+  triggered_at: string
+  status: 'open' | 'acknowledged' | 'resolved'
+  message: string | null
+  acknowledged_by: string | null
+  acknowledged_at: string | null
+  acknowledged_name: string | null
+}
+
+type MedicationSchedule = {
+  id: string
+  time_of_day: string
+  amount: string | null
+}
+
+type MedicationRow = {
+  id: string
+  product_name: string | null
+  dosage: string | null
+  active: boolean
+  archived: boolean
+  category: 'regular' | 'as_needed' | 'pan'
+  instructions: string | null
+  schedule_mode: 'fixed' | 'rolling_interval'
+  interval_hours: number | null
+  reset_time: string | null
+  is_key_med: boolean
+  medication_schedules: MedicationSchedule[] | null
+}
+
+type AppointmentRow = {
+  id: string
+  kind: 'medical' | 'private'
+  title: string
+  appointment_at: string
+  location: string | null
+  notes: string | null
+}
+
+type IntakeEventRow = {
+  id: string
+  medication_id: string
+  schedule_id: string | null
+  planned_for: string
+  taken_at: string
+}
+
+type TodayDose = {
+  key: string
+  medicationId: string
+  medication: string
+  scheduleId: string | null
+  amount: string
+  time: string
+  plannedForIso: string
+  minutes: number
+  isTaken: boolean
+  isKey: boolean
+}
+
+function startOfDay(date: Date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function timeToMinutes(value: string) {
+  const [hh, mm] = value.slice(0, 5).split(':').map(Number)
+  return hh * 60 + mm
+}
+
+export default async function DashboardPage() {
+  noStore()
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, role')
+    .eq('id', user.id)
+    .single()
+
+  const { data: patients } = await supabase
+    .from('patient_access')
+    .select('access_role, patients(id, full_name)')
+    .eq('user_id', user.id)
+
+  const patientId = Array.isArray(patients) && patients.length
+    ? (Array.isArray(patients[0].patients) ? patients[0].patients[0]?.id : patients[0].patients?.id)
+    : null
+
+  const patientName = Array.isArray(patients) && patients.length
+    ? (Array.isArray(patients[0].patients) ? patients[0].patients[0]?.full_name : patients[0].patients?.full_name)
+    : null
+
+  let alerts: PanicAlert[] = []
+  let medications: MedicationRow[] = []
+  let appointments: AppointmentRow[] = []
+  let intakeEvents: IntakeEventRow[] = []
+
+  const now = new Date()
+  const dayStart = startOfDay(now)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+
+  if (patientId) {
+    const { data: alertData } = await supabase
+      .from('panic_alerts')
+      .select('id, triggered_at, status, message, acknowledged_by, acknowledged_at, acknowledged_name')
+      .eq('patient_id', patientId)
+      .order('triggered_at', { ascending: false })
+    alerts = (alertData || []) as PanicAlert[]
+
+    const { data: medData } = await supabase
+      .from('medications')
+      .select('id, product_name, dosage, active, archived, category, instructions, schedule_mode, interval_hours, reset_time, is_key_med, medication_schedules(id, time_of_day, amount)')
+      .eq('patient_id', patientId)
+      .order('category', { ascending: true })
+      .order('product_name', { ascending: true })
+    medications = (medData || []) as MedicationRow[]
+
+    const { data: appointmentData } = await supabase
+      .from('appointments')
+      .select('id, kind, title, appointment_at, location, notes')
+      .eq('patient_id', patientId)
+      .gte('appointment_at', new Date().toISOString())
+      .order('appointment_at', { ascending: true })
+    appointments = (appointmentData || []) as AppointmentRow[]
+
+    const { data: intakeData } = await supabase
+      .from('intake_events')
+      .select('id, medication_id, schedule_id, planned_for, taken_at')
+      .eq('patient_id', patientId)
+      .gte('planned_for', dayStart.toISOString())
+      .lt('planned_for', dayEnd.toISOString())
+      .order('planned_for', { ascending: true })
+    intakeEvents = (intakeData || []) as IntakeEventRow[]
+  }
+
+  const openAlerts = alerts.filter((a) => a.status === 'open')
+  const openAlert = openAlerts[0] || null
+  const acknowledgedAlert = alerts.find((a) => a.status === 'acknowledged') || null
+
+  const acknowledgedName =
+    acknowledgedAlert?.acknowledged_name && acknowledgedAlert.acknowledged_name.trim().length > 0
+      ? acknowledgedAlert.acknowledged_name
+      : null
+
+  const visibleMeds = medications.filter((m) => !m.archived)
+  const archivedMeds = medications.filter((m) => m.archived)
+  const regularMeds = visibleMeds.filter((m) => m.category === 'regular')
+  const activeRegularMeds = regularMeds.filter((m) => m.active)
+  const inactiveRegularMeds = regularMeds.filter((m) => !m.active)
+  const asNeededMeds = visibleMeds.filter((m) => m.category === 'as_needed')
+  const panMeds = visibleMeds.filter((m) => m.category === 'pan')
+  const nextAppointment = appointments[0] || null
+
+  const openIntakes = activeRegularMeds.flatMap((med) =>
+    (med.medication_schedules || [])
+      .slice()
+      .sort((a, b) => a.time_of_day.localeCompare(b.time_of_day))
+      .map((schedule) => {
+        const [hh, mm] = schedule.time_of_day.slice(0, 5).split(':').map(Number)
+        const planned = new Date(dayStart)
+        planned.setHours(hh, mm, 0, 0)
+
+        const taken = intakeEvents.some((e) =>
+          e.medication_id === med.id &&
+          e.schedule_id === schedule.id &&
+          e.planned_for.slice(0, 16) == planned.toISOString().slice(0, 16)
+        )
+
+        return {
+          key: `${med.id}-${schedule.id}-${planned.toISOString()}`,
+          medication_id: med.id,
+          schedule_id: schedule.id,
+          product_name: med.product_name || 'Medikament',
+          amount: schedule.amount || '',
+          planned_for: planned.toISOString(),
+          time_label: schedule.time_of_day.slice(0, 5),
+          is_overdue: planned.getTime() < now.getTime(),
+          taken,
+        }
+      })
+  ).filter((item) => !item.taken)
+
+  const morphineMed = activeRegularMeds.find((m) => m.schedule_mode === 'rolling_interval') || null
+  const normalMeds = activeRegularMeds.filter((m) => m.id !== morphineMed?.id)
+
+  const todayDoses: TodayDose[] = []
+
+  for (const med of normalMeds) {
+    for (const schedule of (med.medication_schedules || []).slice().sort((a, b) => a.time_of_day.localeCompare(b.time_of_day))) {
+      const planned = new Date(dayStart)
+      const [hh, mm] = schedule.time_of_day.slice(0, 5).split(':').map(Number)
+      planned.setHours(hh, mm, 0, 0)
+
+      const isTaken = intakeEvents.some((e) =>
+        e.medication_id === med.id &&
+        e.schedule_id === schedule.id &&
+        e.planned_for.slice(0, 16) === planned.toISOString().slice(0, 16)
+      )
+
+      todayDoses.push({
+        key: `${med.id}-${schedule.id}-${planned.toISOString()}`,
+        medicationId: med.id,
+        medication: med.product_name || 'Medikament',
+        scheduleId: schedule.id,
+        amount: schedule.amount || '',
+        time: schedule.time_of_day.slice(0, 5),
+        plannedForIso: planned.toISOString(),
+        minutes: hh * 60 + mm,
+        isTaken,
+        isKey: med.is_key_med,
+      })
+    }
+  }
+
+  if (morphineMed) {
+    const lastMorphineEvent = intakeEvents
+      .filter((e) => e.medication_id === morphineMed.id)
+      .sort((a, b) => new Date(b.taken_at).getTime() - new Date(a.taken_at).getTime())[0] || null
+
+    const resetMinutes = morphineMed.reset_time ? timeToMinutes(morphineMed.reset_time) : 8 * 60
+    const basePlan = [
+      { time: '08:00', amount: '2' },
+      { time: '16:00', amount: '1' },
+      { time: '00:00', amount: '2' },
+    ]
+
+    if (!lastMorphineEvent) {
+      for (const item of basePlan) {
+        const planned = new Date(dayStart)
+        const [hh, mm] = item.time.split(':').map(Number)
+        planned.setHours(hh, mm, 0, 0)
+
+        const isTaken = intakeEvents.some((e) =>
+          e.medication_id === morphineMed.id &&
+          e.planned_for.slice(0, 16) === planned.toISOString().slice(0, 16)
+        )
+
+        todayDoses.push({
+          key: `morphin-base-${item.time}`,
+          medicationId: morphineMed.id,
+          medication: morphineMed.product_name || 'Morphin',
+          scheduleId: null,
+          amount: item.amount,
+          time: item.time,
+          plannedForIso: planned.toISOString(),
+          minutes: hh * 60 + mm,
+          isTaken,
+          isKey: true,
+        })
+      }
+    } else {
+      const lastTaken = new Date(lastMorphineEvent.taken_at)
+      const nextDue = new Date(lastTaken.getTime() + (morphineMed.interval_hours || 8) * 60 * 60 * 1000)
+      const resetToday = new Date(dayStart)
+      resetToday.setHours(Math.floor(resetMinutes / 60), resetMinutes % 60, 0, 0)
+
+      if (nextDue < resetToday) {
+        const hh = String(nextDue.getHours()).padStart(2, '0')
+        const mm = String(nextDue.getMinutes()).padStart(2, '0')
+        const label = `${hh}:${mm}`
+
+        todayDoses.push({
+          key: `morphin-dynamic-${nextDue.toISOString()}`,
+          medicationId: morphineMed.id,
+          medication: morphineMed.product_name || 'Morphin',
+          scheduleId: null,
+          amount: 'nachgeführt',
+          time: label,
+          plannedForIso: nextDue.toISOString(),
+          minutes: nextDue.getHours() * 60 + nextDue.getMinutes(),
+          isTaken: intakeEvents.some((e) => e.medication_id === morphineMed.id && e.planned_for.slice(0, 16) === nextDue.toISOString().slice(0, 16)),
+          isKey: true,
+        })
+      } else {
+        const eight = new Date(dayStart)
+        eight.setHours(8, 0, 0, 0)
+        const isTaken = intakeEvents.some((e) =>
+          e.medication_id === morphineMed.id &&
+          e.planned_for.slice(0, 16) === eight.toISOString().slice(0, 16)
+        )
+        todayDoses.push({
+          key: `morphin-reset-0800`,
+          medicationId: morphineMed.id,
+          medication: morphineMed.product_name || 'Morphin',
+          scheduleId: null,
+          amount: '2',
+          time: '08:00',
+          plannedForIso: eight.toISOString(),
+          minutes: 8 * 60,
+          isTaken,
+          isKey: true,
+        })
+      }
+    }
+  }
+
+  todayDoses.sort((a, b) => a.minutes - b.minutes)
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const nextMedication =
+    todayDoses.find((d) => !d.isTaken && d.minutes >= currentMinutes)
+    || todayDoses.find((d) => !d.isTaken)
+    || null
+
+  const timeText = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  const dateText = now.toLocaleDateString('de-DE', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  })
+
+  return (
+    <main className="min-h-screen px-4 py-5 sm:px-6">
+      <div className="mx-auto max-w-4xl space-y-4">
+        <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-4 shadow-2xl shadow-black/20 sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="inline-flex items-center rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/5">
+              Start
+            </Link>
+
+            <form action="/auth/signout" method="post">
+              <button className="inline-flex items-center rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-2 text-sm font-medium text-white transition hover:bg-white/5" type="submit">
+                Abmelden
+              </button>
+            </form>
+          </div>
+        </section>
+
+        {profile?.role === 'patient' ? (
+          <>
+            <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
+              <div className="text-center">
+                <div className="text-6xl font-bold tracking-tight text-white sm:text-7xl">{timeText}</div>
+                <div className="mt-3 text-lg capitalize text-[var(--muted)] sm:text-2xl">{dateText}</div>
+              </div>
+            </section>
+
+            <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
+              <div className="text-center">
+                <div className="text-lg font-semibold text-white sm:text-2xl">
+                  Hallo {profile?.full_name || 'Angelika'}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
+              <div className="text-center">
+                <div className="text-base font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Nächster Termin
+                </div>
+                {nextAppointment ? (
+                  <>
+                    <div className="mt-3 text-xl font-bold text-white">{nextAppointment.title}</div>
+                    <div className="mt-2 text-base text-[var(--muted)] sm:text-lg">
+                      {new Date(nextAppointment.appointment_at).toLocaleString('de-DE')}
+                    </div>
+                    {nextAppointment.location ? (
+                      <div className="mt-2 text-base text-[var(--muted)]">{nextAppointment.location}</div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="mt-3 text-base text-[var(--muted)]">Kein Termin eingetragen</div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
+              <div className="text-center">
+                <div className="text-base font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Nächstes Medikament
+                </div>
+                {nextMedication ? (
+                  <>
+                    <div className="mt-3 text-xl font-bold text-white">{nextMedication.medication}</div>
+                    <div className="mt-2 text-base text-[var(--muted)] sm:text-lg">
+                      um {nextMedication.time}{nextMedication.amount ? ` · ${nextMedication.amount}` : ''}
+                    </div>
+                    <form action="/intake/confirm" method="post" className="mt-4">
+                      <input type="hidden" name="medication_id" value={nextMedication.medicationId} />
+                      <input type="hidden" name="schedule_id" value={nextMedication.scheduleId || ''} />
+                      <input type="hidden" name="planned_for" value={nextMedication.plannedForIso} />
+                      <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                        genommen
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <div className="mt-3 text-base text-[var(--muted)]">Keine Einnahme geplant</div>
+                )}
+              </div>
+            </section>
+
+            {openAlert ? (
+              <section className="rounded-[32px] border border-amber-500/35 bg-amber-500/10 p-5 text-center shadow-2xl shadow-black/20 sm:p-6">
+                <div className="text-xl font-bold text-amber-100 sm:text-2xl">Familie wurde informiert</div>
+                <div className="mt-3 text-base text-amber-50/80 sm:text-lg">
+                  Bitte warten. Jemand aus der Familie kümmert sich.
+                </div>
+              </section>
+            ) : acknowledgedAlert ? (
+              <section className="rounded-[32px] border border-green-500/35 bg-green-500/10 p-5 text-center shadow-2xl shadow-black/20 sm:p-6">
+                <div className="text-xl font-bold text-green-100 sm:text-2xl">Hilfe wurde angenommen</div>
+                <div className="mt-3 text-base text-green-50/80 sm:text-lg">
+                  {acknowledgedName ? `${acknowledgedName} kümmert sich.` : 'Die Familie kümmert sich.'}
+                </div>
+              </section>
+            ) : (
+              <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-center shadow-2xl shadow-black/20 sm:p-6">
+                <div className="text-lg font-semibold text-white sm:text-xl">Alles ruhig</div>
+                <div className="mt-2 text-base text-[var(--muted)]">
+                  Es liegt aktuell kein offener Notfall vor.
+                </div>
+              </section>
+            )}
+
+            <section className="rounded-[32px] border border-red-500/35 bg-[linear-gradient(180deg,rgba(220,38,38,0.22),rgba(127,29,29,0.16))] p-5 shadow-2xl shadow-red-950/30 sm:p-8">
+              <form action="/panic" method="post">
+                <button className="w-full rounded-[36px] bg-[var(--danger)] px-6 py-14 text-4xl font-bold tracking-wide text-white shadow-xl shadow-red-950/40 transition hover:brightness-110 active:scale-[0.99] sm:py-20 sm:text-6xl">
+                  HILFE HOLEN
+                </button>
+              </form>
+            </section>
+          </>
+        ) : (
+          <>
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-200">
+                    Dashboard
+                  </div>
+                  <h1 className="mt-4 text-3xl font-bold tracking-tight text-white">
+                    Hallo {profile?.full_name || 'Nutzer'}
+                  </h1>
+                  <p className="mt-2 text-sm text-[var(--muted)]">
+                    Rolle: <span className="font-medium text-white">{profile?.role || '-'}</span>
+                  </p>
+                  <PushRegister />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:w-auto">
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
+                    <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Offene Notfälle</div>
+                    <div className="mt-2 text-2xl font-bold text-white">{openAlerts.length}</div>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
+                    <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Medikamente</div>
+                    <div className="mt-2 text-2xl font-bold text-white">{medications.length}</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Termin anlegen</h2>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Arzttermine und private Termine in einer gemeinsamen Liste.
+                  </p>
+                </div>
+              </div>
+
+              <form action="/appointments/create" method="post" className="mt-5 grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="patient_id" value={patientId || ''} />
+                <select className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="kind" defaultValue="medical">
+                  <option value="medical">Arzttermin</option>
+                  <option value="private">Privater Termin</option>
+                </select>
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="title" placeholder="Titel" required />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="date" name="date" required />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="time" name="time" required />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white sm:col-span-2" type="text" name="location" placeholder="Ort" />
+                <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white sm:col-span-2" name="notes" placeholder="Notizen" rows={3} />
+                <div className="sm:col-span-2">
+                  <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                    Termin anlegen
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-6 space-y-3">
+                {appointments.length ? appointments.map((appointment) => (
+                  <form
+                    key={appointment.id}
+                    action="/appointments/update"
+                    method="post"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4"
+                  >
+                    <input type="hidden" name="id" value={appointment.id} />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <select className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" name="kind" defaultValue={appointment.kind}>
+                        <option value="medical">Arzttermin</option>
+                        <option value="private">Privater Termin</option>
+                      </select>
+
+                      <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="title" defaultValue={appointment.title} required />
+                      <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="date" name="date" defaultValue={appointment.appointment_at.slice(0, 10)} required />
+                      <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="time" name="time" defaultValue={appointment.appointment_at.slice(11, 16)} required />
+                      <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white sm:col-span-2" type="text" name="location" defaultValue={appointment.location || ''} placeholder="Ort" />
+                      <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white sm:col-span-2" name="notes" defaultValue={appointment.notes || ''} placeholder="Notizen" rows={3} />
+                      <div className="flex flex-wrap gap-2 sm:col-span-2">
+                        <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                          Speichern
+                        </button>
+                        <button
+                          formAction="/appointments/delete"
+                          formMethod="post"
+                          name="id"
+                          value={appointment.id}
+                          className="rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-3 font-semibold text-red-200 transition hover:bg-red-500/20"
+                        >
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )) : (
+                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4 text-sm text-[var(--muted)]">
+                    Noch keine Termine eingetragen
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Neues Medikament anlegen</h2>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Für {patientName || 'den Patienten'} direkt im System erfassen. Bei fester Medikation können morgens, mittags, abends und nachts sofort mit angelegt werden.
+                  </p>
+                </div>
+              </div>
+
+              <form action="/medications/create" method="post" className="mt-5 grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="patient_id" value={patientId || ''} />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="name" placeholder="Wirkstoff / Kurzname" />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="product_name" placeholder="Produktname" required />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="dosage" placeholder="Dosierung" />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="form" placeholder="Form" />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="route" placeholder="Applikation" />
+                <select className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="category" defaultValue="regular">
+                  <option value="regular">Feste Medikation</option>
+                  <option value="as_needed">Bedarf</option>
+                  <option value="pan">PAN</option>
+                </select>
+                <select className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="active" defaultValue="true">
+                  <option value="true">aktiv</option>
+                  <option value="false">nicht aktiv</option>
+                </select>
+                <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white sm:col-span-2" name="instructions" placeholder="Hinweise" rows={3} />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="morning_amount" placeholder="morgens" />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="midday_amount" placeholder="mittags" />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="evening_amount" placeholder="abends" />
+                <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="night_amount" placeholder="nachts" />
+                <div className="sm:col-span-2">
+                  <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                    Medikament anlegen
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">Offene Notfälle</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Neue Alarme stehen hier ganz oben.</p>
+
+              <div className="mt-5 space-y-4">
+                {openAlerts.length ? openAlerts.map((alert) => (
+                  <div key={alert.id} className="rounded-3xl border border-red-500/35 bg-[linear-gradient(180deg,rgba(220,38,38,0.18),rgba(24,24,27,0.92))] p-5 shadow-lg shadow-red-950/20">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-lg font-semibold text-white">Offener Notfall</p>
+                        <p className="mt-1 text-sm text-red-100/80">
+                          {new Date(alert.triggered_at).toLocaleString('de-DE')}
+                        </p>
+                        <p className="mt-3 text-sm leading-6 text-red-50/90">
+                          {alert.message || 'Kein Zusatztext'}
+                        </p>
+                      </div>
+
+                      <form className="sm:min-w-[180px]" action="/panic/ack" method="post">
+                        <input type="hidden" name="id" value={alert.id} />
+                        <button className="w-full rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                          Ich übernehme
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="rounded-3xl border border-green-500/35 bg-green-500/10 p-5">
+                    <div className="text-lg font-semibold text-green-100">Kein offener Notfall mehr</div>
+                    <div className="mt-2 text-sm text-green-50/80">
+                      {acknowledgedName ? `Übernommen von ${acknowledgedName}.` : 'Der letzte Notfall wurde übernommen.'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {acknowledgedAlert ? (
+              <section className="rounded-[28px] border border-green-500/35 bg-green-500/10 p-5 shadow-2xl shadow-black/20 sm:p-7">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-green-100">Zuletzt übernommen</h2>
+                    <p className="mt-2 text-base text-green-50/80">
+                      {acknowledgedName ? `${acknowledgedName} hat den Notfall übernommen.` : 'Ein Familienmitglied hat den Notfall übernommen.'}
+                    </p>
+                  </div>
+
+                  <form action="/panic/reset" method="post">
+                    <input type="hidden" name="id" value={acknowledgedAlert.id} />
+                    <button className="rounded-2xl border border-green-400/30 bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                      Als erledigt markieren
+                    </button>
+                  </form>
+                </div>
+              </section>
+            ) : null}
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">Feste Medikation</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Aktive Medikamente mit festen Uhrzeiten.</p>
+
+              <div className="mt-5 space-y-3">
+                {activeRegularMeds.map((med) => (
+                  <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="text-base font-semibold text-white">{med.product_name || med.id}</div>
+                        <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <form action="/medications/toggle" method="post">
+                          <input type="hidden" name="id" value={med.id} />
+                          <button className="inline-flex rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-200 transition hover:bg-green-500/20">
+                            aktiv
+                          </button>
+                        </form>
+                        <form action="/medications/archive" method="post">
+                          <input type="hidden" name="id" value={med.id} />
+                          <button className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20">
+                            archivieren
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-3">
+                      {(med.medication_schedules || []).sort((a, b) => a.time_of_day.localeCompare(b.time_of_day)).map((schedule) => (
+                        <form
+                          key={schedule.id}
+                          action="/medications/schedule/update"
+                          method="post"
+                          className="flex flex-col gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 sm:flex-row sm:items-center"
+                        >
+                          <input type="hidden" name="id" value={schedule.id} />
+                          <input className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-white" type="time" name="time" defaultValue={schedule.time_of_day.slice(0, 5)} />
+                          <input className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-white" type="text" name="amount" defaultValue={schedule.amount || ''} placeholder="Menge" />
+                          <button className="rounded-xl bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-200">
+                            Speichern
+                          </button>
+                        </form>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">Derzeit nicht aktiv</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Pausierte oder aktuell nicht genutzte Medikamente.</p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {inactiveRegularMeds.map((med) => (
+                  <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-white">{med.product_name}</div>
+                        <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <form action="/medications/toggle" method="post">
+                          <input type="hidden" name="id" value={med.id} />
+                          <button className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-3 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-500/20">
+                            nicht aktiv
+                          </button>
+                        </form>
+                        <form action="/medications/archive" method="post">
+                          <input type="hidden" name="id" value={med.id} />
+                          <button className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20">
+                            archivieren
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">Archiviert</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Nicht mehr aktive, ausgeblendete Medikamente.</p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {archivedMeds.map((med) => (
+                  <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-white">{med.product_name}</div>
+                        <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <form action="/medications/restore" method="post">
+                          <input type="hidden" name="id" value={med.id} />
+                          <button className="inline-flex rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-200 transition hover:bg-green-500/20">
+                            wiederherstellen
+                          </button>
+                        </form>
+                        <form action="/medications/delete" method="post">
+                          <input type="hidden" name="id" value={med.id} />
+                          <button className="inline-flex rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20">
+                            löschen
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">Offene Einnahmen</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Heute noch nicht bestätigte Einnahmen.
+              </p>
+
+              <div className="mt-5 space-y-3">
+                {openIntakes.length ? openIntakes.map((entry) => (
+                  <div
+                    key={entry.key}
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="text-base font-semibold text-white">
+                          {entry.product_name}
+                        </div>
+                        <div className="mt-1 text-sm text-[var(--muted)]">
+                          geplant: {entry.time_label}{entry.amount ? ` · ${entry.amount}` : ''}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        {entry.is_overdue ? (
+                          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200">
+                            offen
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-200">
+                            später heute
+                          </div>
+                        )}
+
+                        <form action="/intake/confirm" method="post">
+                          <input type="hidden" name="medication_id" value={entry.medication_id} />
+                          <input type="hidden" name="schedule_id" value={entry.schedule_id} />
+                          <input type="hidden" name="planned_for" value={entry.planned_for} />
+                          <button className="rounded-xl bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-200">
+                            genommen
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="rounded-2xl border border-green-500/35 bg-green-500/10 p-4 text-sm text-green-100">
+                    Alle Einnahmen für heute sind bestätigt.
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">Bedarfsmedikation</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Medikamente ohne festen Tagesplan.</p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {asNeededMeds.map((med) => (
+                  <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+                    <div className="text-base font-semibold text-white">{med.product_name}</div>
+                    <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                    {med.instructions ? (
+                      <div className="mt-3 text-sm text-amber-100/80">{med.instructions}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+              <h2 className="text-xl font-semibold text-white">PAN-Medikation</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">PAN-Versorgung getrennt sichtbar.</p>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {panMeds.map((med) => (
+                  <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4">
+                    <div className="text-base font-semibold text-white">{med.product_name}</div>
+                    <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                    {med.instructions ? (
+                      <div className="mt-3 text-sm text-red-100/80">{med.instructions}</div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </div>
+    </main>
+  )
+}

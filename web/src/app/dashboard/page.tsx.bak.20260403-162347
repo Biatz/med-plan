@@ -1,0 +1,153 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+
+type PatientEntry = {
+  access_role: string
+  patients: { id: string; full_name: string }[] | { id: string; full_name: string } | null
+}
+
+export default async function DashboardPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, role')
+    .eq('id', user.id)
+    .single()
+
+  const { data: patients } = await supabase
+    .from('patient_access')
+    .select('access_role, patients(id, full_name)')
+    .eq('user_id', user.id)
+
+  const { data: panicAlerts } = await supabase
+    .from('panic_alerts')
+    .select('id, triggered_at, status, message')
+    .eq('status', 'open')
+    .order('triggered_at', { ascending: false })
+
+  return (
+    <main className="min-h-screen px-4 py-5 sm:px-6">
+      <div className="mx-auto max-w-6xl space-y-5">
+        <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-200">
+                Dashboard
+              </div>
+              <h1 className="mt-4 text-3xl font-bold tracking-tight text-white">
+                Hallo {profile?.full_name || 'Nutzer'}
+              </h1>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                Rolle: <span className="font-medium text-white">{profile?.role || '-'}</span>
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:w-auto">
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Offene Notfälle</div>
+                <div className="mt-2 text-2xl font-bold text-white">{panicAlerts?.length || 0}</div>
+              </div>
+              <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Zugriffe</div>
+                <div className="mt-2 text-2xl font-bold text-white">{patients?.length || 0}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {profile?.role === 'patient' ? (
+          <section className="rounded-[28px] border border-red-500/35 bg-[linear-gradient(180deg,rgba(220,38,38,0.22),rgba(127,29,29,0.16))] p-5 shadow-2xl shadow-red-950/30 sm:p-7">
+            <div className="rounded-3xl border border-red-400/30 bg-black/10 p-6 sm:p-8">
+              <div className="text-sm font-medium uppercase tracking-[0.18em] text-red-100/80">
+                Notfall
+              </div>
+              <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
+                Hilfe sofort an Familie senden
+              </h2>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-red-100/80">
+                Ein Tipp genügt. Die Familie wird informiert und kann den Notfall übernehmen.
+              </p>
+
+              <form className="mt-8" action="/panic" method="post">
+                <button className="w-full rounded-[32px] bg-[var(--danger)] px-6 py-10 text-3xl font-bold tracking-wide text-white shadow-xl shadow-red-950/40 transition hover:brightness-110 active:scale-[0.99] sm:py-14 sm:text-5xl">
+                  HILFE HOLEN
+                </button>
+              </form>
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Offene Notfälle</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Neue Alarme stehen hier ganz oben.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {panicAlerts?.length ? panicAlerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="rounded-3xl border border-red-500/35 bg-[linear-gradient(180deg,rgba(220,38,38,0.18),rgba(24,24,27,0.92))] p-5 shadow-lg shadow-red-950/20"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-lg font-semibold text-white">Offener Notfall</p>
+                      <p className="mt-1 text-sm text-red-100/80">
+                        {new Date(alert.triggered_at).toLocaleString('de-DE')}
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-red-50/90">
+                        {alert.message || 'Kein Zusatztext'}
+                      </p>
+                    </div>
+
+                    <form className="sm:min-w-[180px]" action="/panic/ack" method="post">
+                      <input type="hidden" name="id" value={alert.id} />
+                      <button className="w-full rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                        Ich übernehme
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-3xl border border-[var(--border)] bg-[var(--card-2)] p-5 text-sm text-[var(--muted)]">
+                  Keine offenen Notfälle
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+          <h2 className="text-xl font-semibold text-white">Zugriffe</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Wer für welchen Patienten freigeschaltet ist.
+          </p>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {(patients as PatientEntry[] | null)?.map((entry, index) => {
+              const patient = Array.isArray(entry.patients) ? entry.patients[0] : entry.patients
+              return (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4"
+                >
+                  <div className="text-base font-semibold text-white">{patient?.full_name || 'Unbekannt'}</div>
+                  <div className="mt-2 inline-flex rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-200">
+                    {entry.access_role}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}
