@@ -1,5 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import webpush from 'web-push'
+
+function getBaseUrl(request: Request) {
+  return process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -31,7 +36,46 @@ export async function POST(request: Request) {
 
   if (error && error.code !== '23505') {
     return NextResponse.redirect(
-      new URL('/dashboard?e=' + encodeURIComponent(error.message), request.url)
+      new URL('/dashboard?e=' + encodeURIComponent(error.message), request.url),
+      { status: 303 }
+    )
+  }
+
+  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+
+  if (publicKey && privateKey) {
+    webpush.setVapidDetails(
+      `mailto:info@angelika.app`,
+      publicKey,
+      privateKey
+    )
+
+    const { data: subscriptions } = await supabase
+      .from('push_subscriptions')
+      .select('user_id, endpoint, p256dh, auth')
+
+    const recipients = (subscriptions || []).filter((sub) => sub.user_id !== user.id)
+
+    const payload = JSON.stringify({
+      title: 'Notfall',
+      body: 'Angelika hat Hilfe ausgelöst.',
+      url: `${getBaseUrl(request)}/dashboard?panic=open`,
+    })
+
+    await Promise.allSettled(
+      recipients.map((sub) =>
+        webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth,
+            },
+          },
+          payload
+        )
+      )
     )
   }
 
