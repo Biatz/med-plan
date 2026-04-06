@@ -45,11 +45,7 @@ export async function POST(request: Request) {
   const privateKey = process.env.VAPID_PRIVATE_KEY
 
   if (publicKey && privateKey) {
-    webpush.setVapidDetails(
-      `mailto:info@angelika.app`,
-      publicKey,
-      privateKey
-    )
+    webpush.setVapidDetails('mailto:info@angelika.app', publicKey, privateKey)
 
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
