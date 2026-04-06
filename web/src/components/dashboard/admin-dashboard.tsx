@@ -56,7 +56,6 @@ export default function AdminDashboard({
   openAlerts,
   acknowledgedAlert,
   acknowledgedName,
-  medications,
   appointments,
   openIntakes,
   activeRegularMeds,
@@ -68,7 +67,6 @@ export default function AdminDashboard({
   openAlerts: PanicAlert[]
   acknowledgedAlert: PanicAlert | null
   acknowledgedName: string | null
-  medications: MedicationRow[]
   appointments: AppointmentRow[]
   openIntakes: OpenIntake[]
   activeRegularMeds: MedicationRow[]
@@ -96,11 +94,11 @@ export default function AdminDashboard({
 
           <div className="grid grid-cols-2 gap-3 sm:w-[280px]">
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
-              <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Offene Notfälle</div>
+              <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Notfälle</div>
               <div className="mt-2 text-2xl font-bold text-white">{openAlerts.length}</div>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3">
-              <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Offene Einnahmen</div>
+              <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Offen heute</div>
               <div className="mt-2 text-2xl font-bold text-white">{openIntakes.length}</div>
             </div>
           </div>
@@ -115,7 +113,7 @@ export default function AdminDashboard({
                 Notfall aktiv
               </div>
               <h2 className="mt-4 text-3xl font-bold text-white sm:text-4xl">
-                Hilfe wird benötigt
+                Hilfe wird jetzt benötigt
               </h2>
               <p className="mt-3 text-base text-red-50/90">
                 {new Date(openAlerts[0].triggered_at).toLocaleString('de-DE')}
@@ -195,95 +193,84 @@ export default function AdminDashboard({
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <details className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
-          <summary className="cursor-pointer list-none text-lg font-semibold text-white">
-            Termine
-          </summary>
-          <p className="mt-2 text-sm text-[var(--muted)]">Anlegen und bearbeiten</p>
-
-          <form action="/appointments/create" method="post" className="mt-5 grid gap-3">
-            <input type="hidden" name="patient_id" value={patientId || ''} />
-            <select className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="kind" defaultValue="medical">
-              <option value="medical">Arzttermin</option>
-              <option value="private">Privater Termin</option>
-            </select>
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="title" placeholder="Titel" required />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="date" name="date" required />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="time" name="time" required />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="location" placeholder="Ort" />
-            <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="notes" placeholder="Notizen" rows={3} />
-            <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
-              Termin anlegen
-            </button>
-          </form>
-        </details>
-
-        <details className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
-          <summary className="cursor-pointer list-none text-lg font-semibold text-white">
-            Medikamente
-          </summary>
-          <p className="mt-2 text-sm text-[var(--muted)]">Neues Medikament erfassen</p>
-
-          <form action="/medications/create" method="post" className="mt-5 grid gap-3">
-            <input type="hidden" name="patient_id" value={patientId || ''} />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="product_name" placeholder="Produktname" required />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="dosage" placeholder="Dosierung" />
-            <select className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="category" defaultValue="regular">
-              <option value="regular">Feste Medikation</option>
-              <option value="as_needed">Bedarf</option>
-              <option value="pan">PAN</option>
-            </select>
-            <select className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="active" defaultValue="true">
-              <option value="true">aktiv</option>
-              <option value="false">nicht aktiv</option>
-            </select>
-            <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" name="instructions" placeholder="Hinweise" rows={3} />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="morning_amount" placeholder="morgens" />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="midday_amount" placeholder="mittags" />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="evening_amount" placeholder="abends" />
-            <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="night_amount" placeholder="nachts" />
-            <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
-              Medikament anlegen
-            </button>
-          </form>
-        </details>
-
-        <details className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
-          <summary className="cursor-pointer list-none text-lg font-semibold text-white">
-            Verwaltung
-          </summary>
-          <p className="mt-2 text-sm text-[var(--muted)]">Bestände und offene Aufgaben</p>
-
-          <div className="mt-5 space-y-3">
-            {openIntakes.length ? openIntakes.slice(0, 8).map((entry) => (
-              <div
-                key={entry.key}
-                className={`rounded-2xl border p-4 ${
-                  entry.is_overdue
-                    ? 'border-red-500/30 bg-red-500/10'
-                    : 'border-blue-500/30 bg-blue-500/10'
-                }`}
-              >
-                <div className="text-sm font-semibold text-white">{entry.product_name}</div>
-                <div className="mt-1 text-xs text-white/75">
-                  {entry.time_label}{entry.amount ? ` · ${entry.amount}` : ''}
-                </div>
-              </div>
-            )) : (
-              <div className="rounded-2xl border border-green-500/35 bg-green-500/10 p-4 text-sm text-green-100">
-                Keine offenen Einnahmen
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] p-4 text-sm text-[var(--muted)]">
-              Aktive Medikamente: <span className="font-medium text-white">{activeRegularMeds.length}</span><br />
-              Archiviert: <span className="font-medium text-white">{archivedMeds.length}</span><br />
-              Termine gesamt: <span className="font-medium text-white">{appointments.length}</span>
-            </div>
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
+          <div className="text-sm font-semibold text-white">Termine</div>
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            Arzttermine und private Termine verwalten.
           </div>
-        </details>
+        </div>
+
+        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
+          <div className="text-sm font-semibold text-white">Medikamente</div>
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            Neue Medikamente anlegen und Bestände pflegen.
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
+          <div className="text-sm font-semibold text-white">Verwaltung</div>
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            Seltene Aufgaben bleiben eingeklappt und stören nicht.
+          </div>
+        </div>
       </section>
+
+      <details className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+        <summary className="cursor-pointer list-none text-lg font-semibold text-white">
+          Verwaltung öffnen
+        </summary>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Termine und Medikamente nur bei Bedarf bearbeiten.
+        </p>
+
+        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Termin anlegen</h3>
+            <form action="/appointments/create" method="post" className="mt-4 grid gap-3">
+              <input type="hidden" name="patient_id" value={patientId || ''} />
+              <select className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" name="kind" defaultValue="medical">
+                <option value="medical">Arzttermin</option>
+                <option value="private">Privater Termin</option>
+              </select>
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="title" placeholder="Titel" required />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="date" name="date" required />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="time" name="time" required />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="location" placeholder="Ort" />
+              <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" name="notes" placeholder="Notizen" rows={3} />
+              <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                Termin anlegen
+              </button>
+            </form>
+          </section>
+
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Medikament anlegen</h3>
+            <form action="/medications/create" method="post" className="mt-4 grid gap-3">
+              <input type="hidden" name="patient_id" value={patientId || ''} />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="product_name" placeholder="Produktname" required />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="dosage" placeholder="Dosierung" />
+              <select className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" name="category" defaultValue="regular">
+                <option value="regular">Feste Medikation</option>
+                <option value="as_needed">Bedarf</option>
+                <option value="pan">PAN</option>
+              </select>
+              <select className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" name="active" defaultValue="true">
+                <option value="true">aktiv</option>
+                <option value="false">nicht aktiv</option>
+              </select>
+              <textarea className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" name="instructions" placeholder="Hinweise" rows={3} />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="morning_amount" placeholder="morgens" />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="midday_amount" placeholder="mittags" />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="evening_amount" placeholder="abends" />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="night_amount" placeholder="nachts" />
+              <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                Medikament anlegen
+              </button>
+            </form>
+          </section>
+        </div>
+      </details>
     </>
   )
 }
