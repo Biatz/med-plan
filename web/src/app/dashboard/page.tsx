@@ -151,9 +151,9 @@ export default async function DashboardPage() {
     intakeEvents = (intakeData || []) as IntakeEventRow[]
   }
 
-  const openAlerts = alerts.filter((a) => a.status === 'open')
-  const openAlert = openAlerts[0] || null
-  const acknowledgedAlert = alerts.find((a) => a.status === 'acknowledged') || null
+  const latestAlert = alerts[0] || null
+  const openAlert = latestAlert?.status === 'open' ? latestAlert : null
+  const acknowledgedAlert = latestAlert?.status === 'acknowledged' ? latestAlert : null
 
   const acknowledgedName =
     acknowledgedAlert?.acknowledged_name && acknowledgedAlert.acknowledged_name.trim().length > 0
