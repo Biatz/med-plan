@@ -56,9 +56,12 @@ export async function POST(request: Request) {
     const recipients = subscriptions || []
 
     const payload = JSON.stringify({
-      title: 'Notfall',
-      body: 'Angelika hat Hilfe ausgelöst.',
+      title: '!!! NOTFALL !!!',
+      body: 'Angelika braucht sofort Hilfe.',
       url: `${getBaseUrl(request)}/dashboard?panic=open`,
+      tag: 'panic-alert',
+      renotify: true,
+      requireInteraction: true,
     })
 
     const results = await Promise.allSettled(
