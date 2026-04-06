@@ -105,27 +105,34 @@ export default function AdminDashboard({
       </section>
 
       {openAlerts.length ? (
-        <section className="rounded-[30px] border border-red-500/40 bg-[linear-gradient(180deg,rgba(220,38,38,0.30),rgba(24,24,27,0.96))] p-6 shadow-2xl shadow-red-950/30 sm:p-8">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <section className="rounded-[34px] border-2 border-red-400/70 bg-[linear-gradient(180deg,rgba(220,38,38,0.42),rgba(127,29,29,0.22),rgba(24,24,27,0.98))] p-6 shadow-[0_0_0_1px_rgba(248,113,113,0.18),0_20px_60px_rgba(127,29,29,0.45)] sm:p-8">
+          <div className="rounded-2xl border border-red-300/25 bg-red-950/20 px-4 py-3 text-center text-sm font-black uppercase tracking-[0.35em] text-red-100">
+            !!! NOTFALL AKTIV !!!
+          </div>
+
+          <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <div className="inline-flex rounded-full border border-red-300/30 bg-red-500/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-red-100">
-                Notfall aktiv
+              <div className="inline-flex rounded-full border border-red-200/30 bg-red-500/25 px-4 py-2 text-sm font-bold uppercase tracking-[0.22em] text-red-50">
+                Sofort reagieren
               </div>
-              <h2 className="mt-4 text-3xl font-bold text-white sm:text-4xl">
+
+              <h2 className="mt-5 text-4xl font-black leading-tight text-white sm:text-5xl">
                 Hilfe wird jetzt benötigt
               </h2>
-              <p className="mt-3 text-base text-red-50/90">
+
+              <p className="mt-4 text-lg font-semibold text-red-50">
                 {new Date(openAlerts[0].triggered_at).toLocaleString('de-DE')}
               </p>
-              <p className="mt-3 text-base leading-7 text-red-50/90">
-                {openAlerts[0].message || 'Kein Zusatztext'}
+
+              <p className="mt-4 max-w-2xl text-lg leading-8 text-red-50/95">
+                {openAlerts[0].message || 'Es wurde ein Notfall ohne Zusatztext ausgelöst.'}
               </p>
             </div>
 
-            <form className="lg:min-w-[220px]" action="/panic/ack" method="post">
+            <form className="lg:min-w-[260px]" action="/panic/ack" method="post">
               <input type="hidden" name="id" value={openAlerts[0].id} />
-              <button className="w-full rounded-2xl bg-white px-6 py-4 text-lg font-bold text-black transition hover:bg-gray-200">
-                Ich übernehme
+              <button className="w-full rounded-[24px] bg-white px-6 py-5 text-xl font-black text-black shadow-xl transition hover:scale-[1.01] hover:bg-red-50">
+                Ich übernehme sofort
               </button>
             </form>
           </div>
