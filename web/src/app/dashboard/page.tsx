@@ -190,6 +190,28 @@ export default async function DashboardPage() {
   const panMeds = visibleMeds.filter((m) => m.category === 'pan')
   const nextAppointment = appointments[0] || null
 
+  const todayStart = new Date(dayStart)
+  const tomorrowStart = new Date(dayStart)
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+
+  const dayAfterTomorrowStart = new Date(dayStart)
+  dayAfterTomorrowStart.setDate(dayAfterTomorrowStart.getDate() + 2)
+
+  const appointmentsToday = appointments.filter((appointment) => {
+    const d = new Date(appointment.appointment_at)
+    return d >= todayStart && d < tomorrowStart
+  })
+
+  const appointmentsTomorrow = appointments.filter((appointment) => {
+    const d = new Date(appointment.appointment_at)
+    return d >= tomorrowStart && d < dayAfterTomorrowStart
+  })
+
+  const appointmentsLater = appointments.filter((appointment) => {
+    const d = new Date(appointment.appointment_at)
+    return d >= dayAfterTomorrowStart
+  })
+
   const morphineMed = activeRegularMeds.find((m) => m.schedule_mode === 'rolling_interval') || null
   const normalMeds = activeRegularMeds.filter((m) => m.id !== morphineMed?.id)
 
@@ -451,22 +473,101 @@ export default async function DashboardPage() {
             <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
               <div className="text-center">
                 <div className="text-base font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  Nächster Termin
+                  Termine
                 </div>
-                {nextAppointment ? (
-                  <>
-                    <div className="mt-3 text-xl font-bold text-white">{nextAppointment.title}</div>
-                    <div className="mt-2 text-base text-[var(--muted)] sm:text-lg">
-                      {new Date(nextAppointment.appointment_at).toLocaleString('de-DE')}
-                    </div>
-                    {nextAppointment.location ? (
-                      <div className="mt-2 text-base text-[var(--muted)]">{nextAppointment.location}</div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="mt-3 text-base text-[var(--muted)]">Kein Termin eingetragen</div>
-                )}
               </div>
+
+              {appointments.length ? (
+                <div className="mt-4 space-y-4">
+                  {appointmentsToday.length ? (
+                    <div>
+                      <div className="text-center text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                        Heute
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        {appointmentsToday.map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3"
+                          >
+                            <div className="text-sm font-semibold text-white">
+                              {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}{' '}
+                              · {appointment.title}
+                            </div>
+                            {appointment.location ? (
+                              <div className="mt-1 text-xs text-[var(--muted)]">{appointment.location}</div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {appointmentsTomorrow.length ? (
+                    <div>
+                      <div className="text-center text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                        Morgen
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        {appointmentsTomorrow.map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3"
+                          >
+                            <div className="text-sm font-semibold text-white">
+                              {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}{' '}
+                              · {appointment.title}
+                            </div>
+                            {appointment.location ? (
+                              <div className="mt-1 text-xs text-[var(--muted)]">{appointment.location}</div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {appointmentsLater.length ? (
+                    <div>
+                      <div className="text-center text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                        Später
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        {appointmentsLater.slice(0, 3).map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3"
+                          >
+                            <div className="text-sm font-semibold text-white">
+                              {new Date(appointment.appointment_at).toLocaleDateString('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              })}{' '}
+                              ·{' '}
+                              {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}{' '}
+                              · {appointment.title}
+                            </div>
+                            {appointment.location ? (
+                              <div className="mt-1 text-xs text-[var(--muted)]">{appointment.location}</div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-3 text-center text-base text-[var(--muted)]">Kein Termin eingetragen</div>
+              )}
             </section>
 
             <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
