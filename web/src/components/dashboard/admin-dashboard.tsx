@@ -83,17 +83,32 @@ export default function AdminDashboard({
   contacts: PatientContactRow[]
 }) {
   const nextAppointment = appointments[0] || null
-  const sameDayAppointments = nextAppointment
-    ? appointments.filter((appointment) => {
-        const a = new Date(appointment.appointment_at)
-        const n = new Date(nextAppointment.appointment_at)
-        return (
-          a.getFullYear() === n.getFullYear() &&
-          a.getMonth() === n.getMonth() &&
-          a.getDate() === n.getDate()
-        )
-      })
-    : []
+
+  const now = new Date()
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+
+  const tomorrowStart = new Date(todayStart)
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+
+  const dayAfterTomorrowStart = new Date(todayStart)
+  dayAfterTomorrowStart.setDate(dayAfterTomorrowStart.getDate() + 2)
+
+  const appointmentsToday = appointments.filter((appointment) => {
+    const d = new Date(appointment.appointment_at)
+    return d >= todayStart && d < tomorrowStart
+  })
+
+  const appointmentsTomorrow = appointments.filter((appointment) => {
+    const d = new Date(appointment.appointment_at)
+    return d >= tomorrowStart && d < dayAfterTomorrowStart
+  })
+
+  const appointmentsLater = appointments.filter((appointment) => {
+    const d = new Date(appointment.appointment_at)
+    return d >= dayAfterTomorrowStart
+  })
+
   const emergencyContacts = contacts.filter((contact) => contact.phone)
 
   const contactLabel = (contact: PatientContactRow) =>
@@ -208,27 +223,18 @@ export default function AdminDashboard({
 
       <section className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
-          <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Nächster Termin</div>
-          {nextAppointment ? (
-            <>
-              <div className="mt-3 text-xl font-semibold text-white">{nextAppointment.title}</div>
-              <div className="mt-2 text-sm text-[var(--muted)]">
-                {new Date(nextAppointment.appointment_at).toLocaleString('de-DE')}
-              </div>
-              {nextAppointment.location ? (
-                <div className="mt-2 text-sm text-[var(--muted)]">{nextAppointment.location}</div>
-              ) : null}
+          <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Termine</div>
 
-              {sameDayAppointments.length > 1 ? (
-                <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-3">
-                  <div className="text-xs uppercase tracking-wide text-[var(--muted)]">
-                    Weitere Termine heute
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {sameDayAppointments.map((appointment) => (
+          {appointments.length ? (
+            <div className="mt-3 space-y-4">
+              {appointmentsToday.length ? (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Heute</div>
+                  <div className="mt-2 space-y-2">
+                    {appointmentsToday.map((appointment) => (
                       <div
                         key={appointment.id}
-                        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2"
+                        className="rounded-xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-2"
                       >
                         <div className="text-sm font-medium text-white">
                           {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
@@ -245,7 +251,62 @@ export default function AdminDashboard({
                   </div>
                 </div>
               ) : null}
-            </>
+
+              {appointmentsTomorrow.length ? (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Morgen</div>
+                  <div className="mt-2 space-y-2">
+                    {appointmentsTomorrow.map((appointment) => (
+                      <div
+                        key={appointment.id}
+                        className="rounded-xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-2"
+                      >
+                        <div className="text-sm font-medium text-white">
+                          {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}
+                          · {appointment.title}
+                        </div>
+                        {appointment.location ? (
+                          <div className="mt-1 text-xs text-[var(--muted)]">{appointment.location}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {appointmentsLater.length ? (
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-[var(--muted)]">Später</div>
+                  <div className="mt-2 space-y-2">
+                    {appointmentsLater.slice(0, 3).map((appointment) => (
+                      <div
+                        key={appointment.id}
+                        className="rounded-xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-2"
+                      >
+                        <div className="text-sm font-medium text-white">
+                          {new Date(appointment.appointment_at).toLocaleDateString('de-DE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          })}{' '}
+                          ·{' '}
+                          {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}
+                          · {appointment.title}
+                        </div>
+                        {appointment.location ? (
+                          <div className="mt-1 text-xs text-[var(--muted)]">{appointment.location}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : (
             <div className="mt-3 text-sm text-[var(--muted)]">Kein Termin eingetragen</div>
           )}
