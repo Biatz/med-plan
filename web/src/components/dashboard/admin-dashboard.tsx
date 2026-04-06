@@ -330,41 +330,43 @@ export default function AdminDashboard({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Link
-          href="#verwaltung"
-          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 transition hover:bg-white/5"
+      <section className="grid gap-4 md:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => {
+            const el = document.getElementById('verwaltung')
+            if (!el) return
+            el.setAttribute('open', 'true')
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-left shadow-2xl shadow-black/20 transition hover:bg-white/5"
         >
           <div className="text-sm font-semibold text-white">Termine</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Arzttermine und private Termine verwalten.
           </div>
-        </Link>
+        </button>
 
-        <Link
-          href="#verwaltung"
-          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 transition hover:bg-white/5"
+        <button
+          type="button"
+          onClick={() => {
+            const el = document.getElementById('verwaltung')
+            if (!el) return
+            el.setAttribute('open', 'true')
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-left shadow-2xl shadow-black/20 transition hover:bg-white/5"
         >
           <div className="text-sm font-semibold text-white">Medikamente</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Neue Medikamente anlegen und Bestände pflegen.
           </div>
-        </Link>
-
-        <a
-          href="#verwaltung"
-          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 transition hover:bg-white/5"
-        >
-          <div className="text-sm font-semibold text-white">Verwaltung</div>
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            Seltene Aufgaben bleiben eingeklappt und stören nicht.
-          </div>
-        </a>
+        </button>
       </section>
 
-      <details id="verwaltung" className="scroll-mt-24 rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+      <details id="verwaltung" open className="scroll-mt-24 rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
         <summary className="cursor-pointer list-none text-lg font-semibold text-white">
-          Verwaltung öffnen
+          Verwaltung
         </summary>
         <p className="mt-2 text-sm text-[var(--muted)]">
           Termine und Medikamente nur bei Bedarf bearbeiten.
