@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import PushRegister from '@/components/push-register'
+import DashboardAutoRefresh from '@/components/dashboard-auto-refresh'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -394,6 +395,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="min-h-screen px-4 py-5 sm:px-6">
+      <DashboardAutoRefresh />
       <div className="mx-auto max-w-4xl space-y-4">
         <section className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-4 shadow-2xl shadow-black/20 sm:p-5">
           <div className="flex items-center justify-between gap-3">
