@@ -11,59 +11,92 @@ function urlBase64ToUint8Array(base64String: string) {
 
 export default function PushRegister() {
   const [status, setStatus] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    async function run() {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        setStatus('Push auf diesem Gerät nicht verfügbar')
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setStatus('Push auf diesem Gerät nicht verfügbar')
+      return
+    }
+
+    if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted') {
+        setStatus('Push bereits erlaubt')
+      } else if (Notification.permission === 'denied') {
+        setStatus('Push im Gerät blockiert')
+      } else {
+        setStatus('Push noch nicht aktiviert')
+      }
+    }
+  }, [])
+
+  async function activatePush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setStatus('Push auf diesem Gerät nicht verfügbar')
+      return
+    }
+
+    try {
+      setLoading(true)
+
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setStatus(`Push nicht erlaubt (${permission})`)
+        setLoading(false)
         return
       }
 
-      try {
-        const permission = await Notification.requestPermission()
-        if (permission !== 'granted') {
-          setStatus(`Push nicht erlaubt (${permission})`)
+      const registration = await navigator.serviceWorker.register('/sw.js')
+      const existing = await registration.pushManager.getSubscription()
+
+      let subscription = existing
+      if (!subscription) {
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        if (!vapidKey) {
+          setStatus('VAPID Public Key fehlt')
+          setLoading(false)
           return
         }
 
-        const registration = await navigator.serviceWorker.register('/sw.js')
-        const existing = await registration.pushManager.getSubscription()
-
-        let subscription = existing
-        if (!subscription) {
-          const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-          if (!vapidKey) {
-            setStatus('VAPID Public Key fehlt')
-            return
-          }
-
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey),
-          })
-        }
-
-        const response = await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subscription),
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
         })
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          setStatus(data?.error || 'Push konnte nicht gespeichert werden')
-          return
-        }
-
-        setStatus('Push aktiviert')
-      } catch (error) {
-        console.error(error)
-        setStatus('Push-Registrierung fehlgeschlagen')
       }
+
+      const response = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setStatus(data?.error || 'Push konnte nicht gespeichert werden')
+        setLoading(false)
+        return
+      }
+
+      setStatus('Push aktiviert')
+      setLoading(false)
+    } catch (error) {
+      console.error(error)
+      setStatus('Push-Registrierung fehlgeschlagen')
+      setLoading(false)
     }
+  }
 
-    run()
-  }, [])
-
-  return <div className="mt-3 text-sm text-[var(--muted)]">{status}</div>
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="text-sm text-[var(--muted)]">{status}</div>
+      <button
+        type="button"
+        onClick={activatePush}
+        disabled={loading}
+        className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-white"
+      >
+        {loading ? 'Aktiviere Push ...' : 'Push aktivieren'}
+      </button>
+    </div>
+  )
 }
