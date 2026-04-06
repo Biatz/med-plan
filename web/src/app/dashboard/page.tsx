@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import PushRegister from '@/components/push-register'
 import DashboardAutoRefresh from '@/components/dashboard-auto-refresh'
 import PanicRealtimeRefresh from '@/components/panic-realtime-refresh'
 import AdminDashboard from '@/components/dashboard/admin-dashboard'
@@ -185,10 +184,6 @@ export default async function DashboardPage() {
   const archivedMeds = medications.filter((m) => m.archived)
   const regularMeds = visibleMeds.filter((m) => m.category === 'regular')
   const activeRegularMeds = regularMeds.filter((m) => m.active)
-  const inactiveRegularMeds = regularMeds.filter((m) => !m.active)
-  const asNeededMeds = visibleMeds.filter((m) => m.category === 'as_needed')
-  const panMeds = visibleMeds.filter((m) => m.category === 'pan')
-  const nextAppointment = appointments[0] || null
 
   const todayStart = new Date(dayStart)
   const tomorrowStart = new Date(dayStart)

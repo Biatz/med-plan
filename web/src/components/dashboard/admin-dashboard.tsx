@@ -82,8 +82,6 @@ export default function AdminDashboard({
   archivedMeds: MedicationRow[]
   contacts: PatientContactRow[]
 }) {
-  const nextAppointment = appointments[0] || null
-
   const now = new Date()
   const todayStart = new Date(now)
   todayStart.setHours(0, 0, 0, 0)
