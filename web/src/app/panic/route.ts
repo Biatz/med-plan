@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import webpush from 'web-push'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function getBaseUrl(request: Request) {
   return process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin
@@ -8,6 +9,7 @@ function getBaseUrl(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = await createClient()
+  const admin = createAdminClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
   if (publicKey && privateKey) {
     webpush.setVapidDetails('mailto:info@angelika.app', publicKey, privateKey)
 
-    const { data: subscriptions } = await supabase
+    const { data: subscriptions } = await admin
       .from('push_subscriptions')
       .select('user_id, endpoint, p256dh, auth')
 
