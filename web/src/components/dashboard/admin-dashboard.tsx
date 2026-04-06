@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import PushRegister from '@/components/push-register'
 
 type PanicAlert = {
@@ -331,37 +330,25 @@ export default function AdminDashboard({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => {
-            const el = document.getElementById('verwaltung')
-            if (!el) return
-            el.setAttribute('open', 'true')
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }}
+        <a
+          href="#verwaltung"
           className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-left shadow-2xl shadow-black/20 transition hover:bg-white/5"
         >
           <div className="text-sm font-semibold text-white">Termine</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Arzttermine und private Termine verwalten.
           </div>
-        </button>
+        </a>
 
-        <button
-          type="button"
-          onClick={() => {
-            const el = document.getElementById('verwaltung')
-            if (!el) return
-            el.setAttribute('open', 'true')
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }}
+        <a
+          href="#verwaltung"
           className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-left shadow-2xl shadow-black/20 transition hover:bg-white/5"
         >
           <div className="text-sm font-semibold text-white">Medikamente</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Neue Medikamente anlegen und Bestände pflegen.
           </div>
-        </button>
+        </a>
       </section>
 
       <details id="verwaltung" open className="scroll-mt-24 rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
