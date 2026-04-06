@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import PushRegister from '@/components/push-register'
 
 type PanicAlert = {
@@ -330,29 +331,38 @@ export default function AdminDashboard({
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
+        <Link
+          href="#verwaltung"
+          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 transition hover:bg-white/5"
+        >
           <div className="text-sm font-semibold text-white">Termine</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Arzttermine und private Termine verwalten.
           </div>
-        </div>
+        </Link>
 
-        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
+        <Link
+          href="#verwaltung"
+          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 transition hover:bg-white/5"
+        >
           <div className="text-sm font-semibold text-white">Medikamente</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Neue Medikamente anlegen und Bestände pflegen.
           </div>
-        </div>
+        </Link>
 
-        <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20">
+        <a
+          href="#verwaltung"
+          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 transition hover:bg-white/5"
+        >
           <div className="text-sm font-semibold text-white">Verwaltung</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
             Seltene Aufgaben bleiben eingeklappt und stören nicht.
           </div>
-        </div>
+        </a>
       </section>
 
-      <details className="rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
+      <details id="verwaltung" className="scroll-mt-24 rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
         <summary className="cursor-pointer list-none text-lg font-semibold text-white">
           Verwaltung öffnen
         </summary>
@@ -360,7 +370,7 @@ export default function AdminDashboard({
           Termine und Medikamente nur bei Bedarf bearbeiten.
         </p>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <div className="mt-6 grid gap-6 xl:grid-cols-3">
           <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
             <h3 className="text-lg font-semibold text-white">Termin anlegen</h3>
             <form action="/appointments/create" method="post" className="mt-4 grid gap-3">
@@ -404,6 +414,61 @@ export default function AdminDashboard({
                 Medikament anlegen
               </button>
             </form>
+          </section>
+
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Notfallkontakte</h3>
+
+            <form action="/patient-contacts/create" method="post" className="mt-4 grid gap-3">
+              <input type="hidden" name="patient_id" value={patientId || ''} />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="name" placeholder="Name" required />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="role" placeholder="Rolle" />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="text" name="phone" placeholder="Telefonnummer" required />
+              <input className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-white" type="number" name="sort_order" placeholder="Sortierung" defaultValue="0" />
+              <label className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+                <input type="checkbox" name="is_primary" value="1" />
+                Primärer Kontakt
+              </label>
+              <button className="rounded-2xl bg-white px-5 py-3 font-semibold text-black transition hover:bg-gray-200">
+                Kontakt anlegen
+              </button>
+            </form>
+
+            <div className="mt-6 space-y-4">
+              {contacts.length ? contacts.map((contact) => (
+                <form
+                  key={contact.id}
+                  action="/patient-contacts/update"
+                  method="post"
+                  className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4"
+                >
+                  <input type="hidden" name="id" value={contact.id} />
+                  <input type="hidden" name="patient_id" value={patientId || ''} />
+                  <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="name" defaultValue={contact.name} required />
+                  <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="role" defaultValue={contact.role || ''} placeholder="Rolle" />
+                  <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="text" name="phone" defaultValue={contact.phone} required />
+                  <input className="rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-4 py-3 text-white" type="number" name="sort_order" defaultValue={contact.sort_order} />
+                  <label className="inline-flex items-center gap-2 text-sm text-[var(--muted)]">
+                    <input type="checkbox" name="is_primary" value="1" defaultChecked={contact.is_primary} />
+                    Primärer Kontakt
+                  </label>
+                  <div className="flex gap-3">
+                    <button className="rounded-2xl bg-white px-4 py-3 font-semibold text-black transition hover:bg-gray-200">
+                      Speichern
+                    </button>
+                    <button
+                      formAction="/patient-contacts/delete"
+                      formMethod="post"
+                      className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 font-semibold text-red-100 transition hover:bg-red-500/20"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                </form>
+              )) : (
+                <div className="text-sm text-[var(--muted)]">Noch keine Kontakte eingetragen.</div>
+              )}
+            </div>
           </section>
         </div>
       </details>
