@@ -26,7 +26,6 @@ type MedicationRow = {
 
 type AppointmentRow = {
   id: string
-  kind: 'medical' | 'private'
   title: string
   appointment_at: string
   location: string | null

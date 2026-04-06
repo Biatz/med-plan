@@ -42,7 +42,6 @@ type MedicationRow = {
 
 type AppointmentRow = {
   id: string
-  kind: 'medical' | 'private'
   title: string
   appointment_at: string
   location: string | null
@@ -137,7 +136,7 @@ export default async function DashboardPage() {
 
     const { data: appointmentData } = await supabase
       .from('appointments')
-      .select('id, kind, title, appointment_at, location, notes')
+      .select('id, title, appointment_at, location, notes')
       .eq('patient_id', patientId)
       .gte('appointment_at', new Date().toISOString())
       .order('appointment_at', { ascending: true })
@@ -515,7 +514,6 @@ export default async function DashboardPage() {
             openAlerts={openAlerts}
             acknowledgedAlert={acknowledgedAlert}
             acknowledgedName={acknowledgedName}
-            medications={medications}
             appointments={appointments}
             openIntakes={openIntakes}
             activeRegularMeds={activeRegularMeds}
