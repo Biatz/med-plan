@@ -329,28 +329,6 @@ export default function AdminDashboard({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <a
-          href="#verwaltung"
-          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-left shadow-2xl shadow-black/20 transition hover:bg-white/5"
-        >
-          <div className="text-sm font-semibold text-white">Termine</div>
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            Arzttermine und private Termine verwalten.
-          </div>
-        </a>
-
-        <a
-          href="#verwaltung"
-          className="block rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 text-left shadow-2xl shadow-black/20 transition hover:bg-white/5"
-        >
-          <div className="text-sm font-semibold text-white">Medikamente</div>
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            Neue Medikamente anlegen und Bestände pflegen.
-          </div>
-        </a>
-      </section>
-
       <details id="verwaltung" open className="scroll-mt-24 rounded-[28px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-7">
         <summary className="cursor-pointer list-none text-lg font-semibold text-white">
           Verwaltung
