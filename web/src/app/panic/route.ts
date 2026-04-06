@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       .from('push_subscriptions')
       .select('user_id, endpoint, p256dh, auth')
 
-    const recipients = (subscriptions || []).filter((sub) => sub.user_id !== user.id)
+    const recipients = subscriptions || []
 
     const payload = JSON.stringify({
       title: 'Notfall',
