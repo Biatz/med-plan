@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       url: `${getBaseUrl(request)}/dashboard?panic=open`,
     })
 
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       recipients.map((sub) =>
         webpush.sendNotification(
           {
@@ -71,6 +71,19 @@ export async function POST(request: Request) {
           },
           payload
         )
+      )
+    )
+
+    console.log('PUSH recipients:', recipients.length)
+    console.log(
+      'PUSH results:',
+      results.map((r) =>
+        r.status === 'fulfilled'
+          ? { status: 'fulfilled' }
+          : {
+              status: 'rejected',
+              reason: String(r.reason),
+            }
       )
     )
   }
