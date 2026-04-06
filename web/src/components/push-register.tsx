@@ -22,7 +22,7 @@ export default function PushRegister() {
       try {
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') {
-          setStatus('Push nicht erlaubt')
+          setStatus(`Push nicht erlaubt (${permission})`)
           return
         }
 
