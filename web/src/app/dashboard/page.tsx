@@ -462,6 +462,14 @@ export default async function DashboardPage() {
               </div>
             </section>
 
+            <section className="rounded-[32px] border border-red-500/35 bg-[linear-gradient(180deg,rgba(220,38,38,0.22),rgba(127,29,29,0.16))] p-4 shadow-2xl shadow-red-950/30 sm:p-5">
+              <form action="/panic" method="post">
+                <button className="w-full rounded-[28px] bg-[var(--danger)] px-5 py-8 text-2xl font-bold tracking-wide text-white shadow-xl shadow-red-950/40 transition hover:brightness-110 active:scale-[0.99] sm:py-10 sm:text-4xl">
+                  HILFE HOLEN
+                </button>
+              </form>
+            </section>
+
             <section className="rounded-[32px] border border-[var(--border)] bg-[var(--card)]/95 p-5 shadow-2xl shadow-black/20 sm:p-6">
               <div className="text-center">
                 <div className="text-lg font-semibold text-white sm:text-2xl">
@@ -619,13 +627,6 @@ export default async function DashboardPage() {
               </section>
             )}
 
-            <section className="rounded-[32px] border border-red-500/35 bg-[linear-gradient(180deg,rgba(220,38,38,0.22),rgba(127,29,29,0.16))] p-5 shadow-2xl shadow-red-950/30 sm:p-8">
-              <form action="/panic" method="post">
-                <button className="w-full rounded-[36px] bg-[var(--danger)] px-6 py-14 text-4xl font-bold tracking-wide text-white shadow-xl shadow-red-950/40 transition hover:brightness-110 active:scale-[0.99] sm:py-20 sm:text-6xl">
-                  HILFE HOLEN
-                </button>
-              </form>
-            </section>
           </>
         ) : (
           <AdminDashboard
