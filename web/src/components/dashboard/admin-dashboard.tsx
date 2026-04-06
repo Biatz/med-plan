@@ -83,6 +83,17 @@ export default function AdminDashboard({
   contacts: PatientContactRow[]
 }) {
   const nextAppointment = appointments[0] || null
+  const sameDayAppointments = nextAppointment
+    ? appointments.filter((appointment) => {
+        const a = new Date(appointment.appointment_at)
+        const n = new Date(nextAppointment.appointment_at)
+        return (
+          a.getFullYear() === n.getFullYear() &&
+          a.getMonth() === n.getMonth() &&
+          a.getDate() === n.getDate()
+        )
+      })
+    : []
   const emergencyContacts = contacts.filter((contact) => contact.phone)
 
   const contactLabel = (contact: PatientContactRow) =>
@@ -206,6 +217,33 @@ export default function AdminDashboard({
               </div>
               {nextAppointment.location ? (
                 <div className="mt-2 text-sm text-[var(--muted)]">{nextAppointment.location}</div>
+              ) : null}
+
+              {sameDayAppointments.length > 1 ? (
+                <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-3">
+                  <div className="text-xs uppercase tracking-wide text-[var(--muted)]">
+                    Weitere Termine heute
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {sameDayAppointments.map((appointment) => (
+                      <div
+                        key={appointment.id}
+                        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2"
+                      >
+                        <div className="text-sm font-medium text-white">
+                          {new Date(appointment.appointment_at).toLocaleTimeString('de-DE', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}
+                          · {appointment.title}
+                        </div>
+                        {appointment.location ? (
+                          <div className="mt-1 text-xs text-[var(--muted)]">{appointment.location}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : null}
             </>
           ) : (
