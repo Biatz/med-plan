@@ -57,6 +57,15 @@ type IntakeEventRow = {
   taken_at: string
 }
 
+type PatientContactRow = {
+  id: string
+  name: string
+  role: string | null
+  phone: string
+  is_primary: boolean
+  sort_order: number
+}
+
 type TodayDose = {
   key: string
   medicationId: string
@@ -113,6 +122,7 @@ export default async function DashboardPage() {
   let medications: MedicationRow[] = []
   let appointments: AppointmentRow[] = []
   let intakeEvents: IntakeEventRow[] = []
+  let contacts: PatientContactRow[] = []
 
   const now = new Date()
   const dayStart = startOfDay(now)
@@ -151,6 +161,14 @@ export default async function DashboardPage() {
       .lt('planned_for', dayEnd.toISOString())
       .order('planned_for', { ascending: true })
     intakeEvents = (intakeData || []) as IntakeEventRow[]
+
+    const { data: contactData } = await supabase
+      .from('patient_contacts')
+      .select('id, name, role, phone, is_primary, sort_order')
+      .eq('patient_id', patientId)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true })
+    contacts = (contactData || []) as PatientContactRow[]
   }
 
   const openAlerts = alerts.filter((a) => a.status === 'open')
@@ -520,6 +538,7 @@ export default async function DashboardPage() {
             openIntakes={openIntakes}
             activeRegularMeds={activeRegularMeds}
             archivedMeds={archivedMeds}
+            contacts={contacts}
           />
         )}
       </div>

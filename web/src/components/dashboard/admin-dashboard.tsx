@@ -48,6 +48,15 @@ type Profile = {
   role?: string | null
 }
 
+type PatientContactRow = {
+  id: string
+  name: string
+  role: string | null
+  phone: string
+  is_primary: boolean
+  sort_order: number
+}
+
 export default function AdminDashboard({
   profile,
   patientId,
@@ -59,6 +68,7 @@ export default function AdminDashboard({
   openIntakes,
   activeRegularMeds,
   archivedMeds,
+  contacts,
 }: {
   profile: Profile | null
   patientId: string | null
@@ -70,8 +80,15 @@ export default function AdminDashboard({
   openIntakes: OpenIntake[]
   activeRegularMeds: MedicationRow[]
   archivedMeds: MedicationRow[]
+  contacts: PatientContactRow[]
 }) {
   const nextAppointment = appointments[0] || null
+  const emergencyContacts = contacts.filter((contact) => contact.phone)
+
+  const contactLabel = (contact: PatientContactRow) =>
+    contact.role ? `${contact.name} (${contact.role})` : contact.name
+
+  const contactHref = (phone: string) => `tel:${phone.replace(/\s+/g, '')}`
 
   return (
     <>
@@ -129,12 +146,28 @@ export default function AdminDashboard({
               </p>
             </div>
 
-            <form className="lg:min-w-[260px]" action="/panic/ack" method="post">
-              <input type="hidden" name="id" value={openAlerts[0].id} />
-              <button className="w-full rounded-[24px] bg-white px-6 py-5 text-xl font-black text-black shadow-xl transition hover:scale-[1.01] hover:bg-red-50">
-                Ich übernehme sofort
-              </button>
-            </form>
+            <div className="lg:min-w-[320px]">
+              <form action="/panic/ack" method="post">
+                <input type="hidden" name="id" value={openAlerts[0].id} />
+                <button className="w-full rounded-[24px] bg-white px-6 py-5 text-xl font-black text-black shadow-xl transition hover:scale-[1.01] hover:bg-red-50">
+                  Ich übernehme sofort
+                </button>
+              </form>
+
+              {emergencyContacts.length ? (
+                <div className="mt-4 grid gap-3">
+                  {emergencyContacts.map((contact) => (
+                    <a
+                      key={contact.id}
+                      href={contactHref(contact.phone!)}
+                      className="rounded-[20px] border border-red-200/30 bg-red-950/35 px-5 py-4 text-center text-base font-bold text-white transition hover:bg-red-900/50"
+                    >
+                      {contactLabel(contact)} anrufen
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
       ) : acknowledgedAlert ? (
