@@ -21,6 +21,7 @@ type MedicationRow = {
   active: boolean
   archived: boolean
   category: 'regular' | 'as_needed' | 'pan'
+  instructions?: string | null
   medication_schedules: MedicationSchedule[] | null
 }
 
@@ -67,6 +68,9 @@ export default function AdminDashboard({
   appointments,
   openIntakes,
   activeRegularMeds,
+  inactiveRegularMeds,
+  asNeededMeds,
+  panMeds,
   archivedMeds,
   contacts,
 }: {
@@ -79,6 +83,9 @@ export default function AdminDashboard({
   appointments: AppointmentRow[]
   openIntakes: OpenIntake[]
   activeRegularMeds: MedicationRow[]
+  inactiveRegularMeds: MedicationRow[]
+  asNeededMeds: MedicationRow[]
+  panMeds: MedicationRow[]
   archivedMeds: MedicationRow[]
   contacts: PatientContactRow[]
 }) {
@@ -434,6 +441,179 @@ export default function AdminDashboard({
                 </form>
               )) : (
                 <div className="text-sm text-[var(--muted)]">Noch keine Kontakte eingetragen.</div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-6 space-y-6">
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Feste Medikation</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">Aktive Medikamente mit festen Uhrzeiten.</p>
+
+            <div className="mt-5 space-y-3">
+              {activeRegularMeds.length ? activeRegularMeds.map((med) => (
+                <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="text-base font-semibold text-white">{med.product_name || med.id}</div>
+                      <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <form action="/medications/toggle" method="post">
+                        <input type="hidden" name="id" value={med.id} />
+                        <button className="inline-flex rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-200 transition hover:bg-green-500/20">
+                          aktiv
+                        </button>
+                      </form>
+                      <form action="/medications/archive" method="post">
+                        <input type="hidden" name="id" value={med.id} />
+                        <button className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20">
+                          archivieren
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-3">
+                    {(med.medication_schedules || []).slice().sort((a, b) => a.time_of_day.localeCompare(b.time_of_day)).map((schedule) => (
+                      <form
+                        key={schedule.id}
+                        action="/medications/schedule/update"
+                        method="post"
+                        className="flex flex-col gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 sm:flex-row sm:items-center"
+                      >
+                        <input type="hidden" name="id" value={schedule.id} />
+                        <input className="rounded-xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-2 text-white" type="time" name="time" defaultValue={schedule.time_of_day.slice(0, 5)} />
+                        <input className="rounded-xl border border-[var(--border)] bg-[var(--card-2)] px-3 py-2 text-white" type="text" name="amount" defaultValue={schedule.amount || ''} placeholder="Menge" />
+                        <button className="rounded-xl bg-white px-4 py-2 font-medium text-black transition hover:bg-gray-200">
+                          Speichern
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm text-[var(--muted)]">
+                  Keine aktive feste Medikation.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Derzeit nicht aktiv</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">Pausierte oder aktuell nicht genutzte Medikamente.</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {inactiveRegularMeds.length ? inactiveRegularMeds.map((med) => (
+                <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-white">{med.product_name || med.id}</div>
+                      <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <form action="/medications/toggle" method="post">
+                        <input type="hidden" name="id" value={med.id} />
+                        <button className="inline-flex rounded-full border border-zinc-500/30 bg-zinc-500/10 px-3 py-1 text-xs font-medium text-zinc-200 transition hover:bg-zinc-500/20">
+                          nicht aktiv
+                        </button>
+                      </form>
+                      <form action="/medications/archive" method="post">
+                        <input type="hidden" name="id" value={med.id} />
+                        <button className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20">
+                          archivieren
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm text-[var(--muted)]">
+                  Keine inaktiven Medikamente.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Archiviert</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">Nicht mehr aktive, ausgeblendete Medikamente.</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {archivedMeds.length ? archivedMeds.map((med) => (
+                <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-white">{med.product_name || med.id}</div>
+                      <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <form action="/medications/restore" method="post">
+                        <input type="hidden" name="id" value={med.id} />
+                        <button className="inline-flex rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-200 transition hover:bg-green-500/20">
+                          wiederherstellen
+                        </button>
+                      </form>
+                      <form action="/medications/delete" method="post">
+                        <input type="hidden" name="id" value={med.id} />
+                        <button className="inline-flex rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20">
+                          löschen
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm text-[var(--muted)]">
+                  Keine archivierten Medikamente.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">Bedarfsmedikation</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">Medikamente ohne festen Tagesplan.</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {asNeededMeds.length ? asNeededMeds.map((med) => (
+                <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                  <div className="text-base font-semibold text-white">{med.product_name || med.id}</div>
+                  <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                  {med.instructions ? (
+                    <div className="mt-3 text-sm text-amber-100/80">{med.instructions}</div>
+                  ) : null}
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm text-[var(--muted)]">
+                  Keine Bedarfsmedikation.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-[var(--border)] bg-[var(--card-2)] p-5">
+            <h3 className="text-lg font-semibold text-white">PAN-Medikation</h3>
+            <p className="mt-1 text-sm text-[var(--muted)]">PAN-Versorgung getrennt sichtbar.</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {panMeds.length ? panMeds.map((med) => (
+                <div key={med.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
+                  <div className="text-base font-semibold text-white">{med.product_name || med.id}</div>
+                  <div className="mt-1 text-sm text-[var(--muted)]">{med.dosage || 'ohne Dosierung'}</div>
+                  {med.instructions ? (
+                    <div className="mt-3 text-sm text-red-100/80">{med.instructions}</div>
+                  ) : null}
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-sm text-[var(--muted)]">
+                  Keine PAN-Medikation.
+                </div>
               )}
             </div>
           </section>

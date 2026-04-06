@@ -184,6 +184,9 @@ export default async function DashboardPage() {
   const archivedMeds = medications.filter((m) => m.archived)
   const regularMeds = visibleMeds.filter((m) => m.category === 'regular')
   const activeRegularMeds = regularMeds.filter((m) => m.active)
+  const inactiveRegularMeds = regularMeds.filter((m) => !m.active)
+  const asNeededMeds = visibleMeds.filter((m) => m.category === 'as_needed')
+  const panMeds = visibleMeds.filter((m) => m.category === 'pan')
 
   const todayStart = new Date(dayStart)
   const tomorrowStart = new Date(dayStart)
@@ -634,6 +637,9 @@ export default async function DashboardPage() {
             appointments={appointments}
             openIntakes={openIntakes}
             activeRegularMeds={activeRegularMeds}
+            inactiveRegularMeds={inactiveRegularMeds}
+            asNeededMeds={asNeededMeds}
+            panMeds={panMeds}
             archivedMeds={archivedMeds}
             contacts={contacts}
           />
